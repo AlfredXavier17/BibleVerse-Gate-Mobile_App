@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:gravity="center"
+    android:background="#121212"
+    android:padding="32dp">
+
+    <TextView
+        android:id="@+id/titleText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="📖 Bible Verse Gate"
+        android:textSize="28sp"
+        android:textColor="#FFFFFF"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="32dp" />
+
+    <TextView
+        android:id="@+id/verseText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="&quot;Be still, and know that I am God.&quot;\n\n— Psalm 46:10"
+        android:textSize="20sp"
+        android:textColor="#CCCCCC"
+        android:gravity="center"
+        android:lineSpacingMultiplier="1.5"
+        android:layout_marginBottom="48dp" />
+
+    <TextView
+        android:id="@+id/messageText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Take a moment to reflect."
+        android:textSize="16sp"
+        android:textColor="#AAAAAA"
+        android:gravity="center"
+        android:layout_marginBottom="16dp" />
+
+    <TextView
+        android:id="@+id/statsText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text=""
+        android:textSize="14sp"
+        android:textColor="#888888"
+        android:gravity="center"
+        android:layout_marginBottom="32dp" />
+
+    <!-- Countdown Text -->
+    <TextView
+        android:id="@+id/countdownText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="5"
+        android:textSize="72sp"
+        android:textColor="#2196F3"
+        android:textStyle="bold"
+        android:layout_marginBottom="48dp" />
+
+    <LinearLayout
+        android:id="@+id/buttonLayout"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center"
+        android:visibility="gone">
+
+        <Button
+            android:id="@+id/closeButton"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="I don't wanna use"
+            android:textSize="14sp"
+            android:layout_marginEnd="8dp"
+            android:backgroundTint="#666666" />
+
+        <Button
+            android:id="@+id/continueButton"
+            android:layout_width="0dp"
+            android:layout_height="56dp"
+            android:layout_weight="1"
+            android:text="Continue"
+            android:textSize="14sp"
+            android:layout_marginStart="8dp"
+            android:backgroundTint="#2196F3" />
+
+    </LinearLayout>
+
+</LinearLayout>

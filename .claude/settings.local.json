@@ -1,0 +1,36 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(.gradlew.bat assembleDebug)",
+      "Bash(./gradlew assembleDebug:*)",
+      "Bash(adb install:*)",
+      "Bash(adb devices:*)",
+      "Bash(adb:*)",
+      "Bash(timeout 5 adb:*)",
+      "Bash(pgrep:*)",
+      "Bash(npx react-native start)",
+      "Bash(./gradlew clean:*)",
+      "Bash(npx react-native:*)",
+      "Bash(dir c:RNBibleVerseGateandroidappbuildoutputsapkdebug)",
+      "Bash(timeout 60 npx react-native run-android:*)",
+      "Bash(./gradlew.bat:*)",
+      "Bash(findstr:*)",
+      "Bash(timeout 10 adb:*)",
+      "Bash(dir \"c:\\\\RN\\\\BibleVerseGate\\\\android\\\\app\\\\build\\\\outputs\\\\apk\\\\debug\")",
+      "Bash(timeout 60 adb:*)",
+      "Bash(timeout 60 ./gradlew.bat:*)",
+      "Bash(.gradlew.bat clean:*)",
+      "Bash(dir:*)",
+      "Bash(keytool:*)",
+      "Bash(copy:*)",
+      "Bash(unzip:*)",
+      "Bash(ls:*)",
+      "Bash(python3:*)",
+      "Bash(npm install:*)",
+      "Bash(node create-icon.js:*)",
+      "Bash(node -e:*)",
+      "Bash(node create-feature-graphic.js:*)",
+      "Bash(node add-text-to-feature.js:*)"
+    ]
+  }
+}
