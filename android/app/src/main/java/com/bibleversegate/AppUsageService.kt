@@ -91,6 +91,8 @@ class AppUsageService : Service() {
                 Log.d(TAG, "Clearing active session for: $activeSessionApp")
                 prefs.edit().remove("active_session_app").apply()
                 activeSessionApp = null
+                // Reset tracking so verse shows again when user reopens the same app
+                lastBlockedPackage = null
             }
 
             // Check if this app is blocked
@@ -130,7 +132,20 @@ class AppUsageService : Service() {
 
     override fun onDestroy() {
         running = false
+        Log.d(TAG, "AppUsageService destroyed - attempting restart")
         super.onDestroy()
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // Restart service when user swipes app away from recent apps
+        Log.d(TAG, "Task removed - restarting service")
+        val restartServiceIntent = Intent(applicationContext, AppUsageService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            applicationContext.startForegroundService(restartServiceIntent)
+        } else {
+            applicationContext.startService(restartServiceIntent)
+        }
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

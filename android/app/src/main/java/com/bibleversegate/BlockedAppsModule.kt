@@ -13,6 +13,7 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.net.Uri
 import android.os.Build
+import android.os.PowerManager
 import android.os.Process
 import android.provider.Settings
 import android.util.Base64
@@ -237,6 +238,103 @@ class BlockedAppsModule(reactContext: ReactApplicationContext) :
             }
 
             promise.resolve(usageMap)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun isBatteryOptimizationDisabled(promise: Promise) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val powerManager = reactApplicationContext.getSystemService(Context.POWER_SERVICE) as PowerManager
+                val isIgnoringBatteryOptimizations = powerManager.isIgnoringBatteryOptimizations(reactApplicationContext.packageName)
+                promise.resolve(isIgnoringBatteryOptimizations)
+            } else {
+                // Battery optimization doesn't exist on older Android versions
+                promise.resolve(true)
+            }
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun requestBatteryOptimizationExemption(promise: Promise) {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                intent.data = Uri.parse("package:${reactApplicationContext.packageName}")
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                reactApplicationContext.startActivity(intent)
+            }
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun hasSeenOnboarding(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("BibleVerseGatePrefs", Context.MODE_PRIVATE)
+            val hasSeenOnboarding = prefs.getBoolean("has_seen_onboarding", false)
+            promise.resolve(hasSeenOnboarding)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun setOnboardingComplete(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("BibleVerseGatePrefs", Context.MODE_PRIVATE)
+            prefs.edit().putBoolean("has_seen_onboarding", true).apply()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getThemePreference(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("BibleVerseGatePrefs", Context.MODE_PRIVATE)
+            val theme = prefs.getString("theme_preference", "dark") ?: "dark"
+            promise.resolve(theme)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun setThemePreference(theme: String, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("BibleVerseGatePrefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("theme_preference", theme).apply()
+            promise.resolve(true)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun getBibleVersion(promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("BibleVerseGatePrefs", Context.MODE_PRIVATE)
+            val version = prefs.getString("bible_version", "KJV") ?: "KJV"
+            promise.resolve(version)
+        } catch (e: Exception) {
+            promise.reject("ERROR", e.message)
+        }
+    }
+
+    @ReactMethod
+    fun setBibleVersion(version: String, promise: Promise) {
+        try {
+            val prefs = reactApplicationContext.getSharedPreferences("BibleVerseGatePrefs", Context.MODE_PRIVATE)
+            prefs.edit().putString("bible_version", version).apply()
+            promise.resolve(true)
         } catch (e: Exception) {
             promise.reject("ERROR", e.message)
         }

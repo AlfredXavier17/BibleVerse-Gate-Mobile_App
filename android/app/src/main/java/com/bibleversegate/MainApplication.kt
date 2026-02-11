@@ -1,6 +1,8 @@
 package com.bibleversegate
 
 import android.app.Application
+import android.content.Intent
+import android.os.Build
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -24,5 +26,13 @@ class MainApplication : Application(), ReactApplication {
   override fun onCreate() {
     super.onCreate()
     loadReactNative(this)
+
+    // Start the monitoring service when the app process starts
+    val serviceIntent = Intent(this, AppUsageService::class.java)
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+      startForegroundService(serviceIntent)
+    } else {
+      startService(serviceIntent)
+    }
   }
 }

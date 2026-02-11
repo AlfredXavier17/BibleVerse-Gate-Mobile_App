@@ -30,7 +30,18 @@
       "Bash(node create-icon.js:*)",
       "Bash(node -e:*)",
       "Bash(node create-feature-graphic.js:*)",
-      "Bash(node add-text-to-feature.js:*)"
+      "Bash(node add-text-to-feature.js:*)",
+      "Bash(gradlew.bat app:installDebug:*)",
+      "Bash(npm start)",
+      "Bash(./gradlew bundleRelease:*)",
+      "Bash(timeout:*)",
+      "Bash(.gradlew.bat app:installDebug:*)",
+      "Bash(c:\\\\RN\\\\BibleVerseGate\\\\android\\\\gradlew.bat:*)",
+      "Bash(cmd.exe /c \"cd /d c:\\\\RN\\\\BibleVerseGate\\\\android && gradlew.bat app:installDebug -PreactNativeDevServerPort=8081\")",
+      "Bash(cmd.exe /c \"cd /d c:\\\\RN\\\\BibleVerseGate && npx react-native run-android\")",
+      "Bash(powershell -Command \"Set-Location ''c:\\\\RN\\\\BibleVerseGate\\\\android''; .\\\\gradlew.bat app:installDebug\")",
+      "Bash(powershell -Command \"Set-Location ''c:\\\\RN\\\\BibleVerseGate''; npx react-native bundle --platform android --dev false --entry-file index.js --bundle-output android/app/src/main/assets/index.android.bundle --assets-dest android/app/src/main/res\")",
+      "Bash(powershell -Command \"Set-Location ''c:\\\\RN\\\\BibleVerseGate\\\\android''; .\\\\gradlew.bat bundleRelease\")"
     ]
   }
 }

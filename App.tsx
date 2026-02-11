@@ -1,5 +1,5 @@
 /**
- * Bible Verse Gate
+ * Bible Verse App Blocker
  */
 
 import React, {useEffect, useState} from 'react';
@@ -7,7 +7,6 @@ import {
   Button,
   StatusBar,
   StyleSheet,
-  useColorScheme,
   View,
   Text,
   FlatList,
@@ -17,6 +16,9 @@ import {
   ActivityIndicator,
   Image,
   TextInput,
+  Switch,
+  Modal,
+  ScrollView,
 } from 'react-native';
 
 import {
@@ -32,21 +34,68 @@ interface InstalledApp {
   icon: string;
 }
 
+// Color schemes
+const DARK_COLORS = {
+  background: '#121212',
+  surface: '#1e1e1e',
+  surfaceVariant: '#2a2a2a',
+  text: '#ffffff',
+  textSecondary: '#cccccc',
+  textTertiary: '#aaaaaa',
+  textDisabled: '#666666',
+  accent: '#2196F3',
+  border: '#333333',
+};
+
+const LIGHT_COLORS = {
+  background: '#E8E8E8',
+  surface: '#F0F0F0',
+  surfaceVariant: '#D8E8F0',
+  text: '#1A1A1A',
+  textSecondary: '#3A3A3A',
+  textTertiary: '#555555',
+  textDisabled: '#888888',
+  accent: '#1565C0',
+  border: '#C0C0C0',
+};
+
 function App() {
-  const isDarkMode = useColorScheme() === 'dark';
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  useEffect(() => {
+    loadTheme();
+  }, []);
+
+  const loadTheme = async () => {
+    try {
+      const savedTheme = await BlockedAppsModule.getThemePreference();
+      setTheme(savedTheme as 'dark' | 'light');
+    } catch (error) {
+      console.error('Error loading theme:', error);
+    }
+  };
+
+  const colors = theme === 'dark' ? DARK_COLORS : LIGHT_COLORS;
 
   return (
     <SafeAreaProvider>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
-      <AppContent />
+      <StatusBar barStyle={theme === 'dark' ? 'light-content' : 'dark-content'} />
+      <AppContent theme={theme} setTheme={setTheme} colors={colors} />
     </SafeAreaProvider>
   );
 }
 
-function AppContent() {
+interface AppContentProps {
+  theme: 'dark' | 'light';
+  setTheme: (theme: 'dark' | 'light') => void;
+  colors: typeof DARK_COLORS;
+}
+
+function AppContent({theme, setTheme, colors}: AppContentProps) {
   const insets = useSafeAreaInsets();
   const [hasPermission, setHasPermission] = useState(false);
   const [hasOverlayPermission, setHasOverlayPermission] = useState(false);
+  const [hasBatteryOptimization, setHasBatteryOptimization] = useState(false);
   const [installedApps, setInstalledApps] = useState<InstalledApp[]>([]);
   const [blockedApps, setBlockedApps] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
@@ -55,10 +104,25 @@ function AppContent() {
   const [countdownTime, setCountdownTime] = useState(5);
   const [usageStats, setUsageStats] = useState<{[key: string]: number}>({});
   const [searchQuery, setSearchQuery] = useState('');
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
+  const [feedbackEmail, setFeedbackEmail] = useState('');
+  const [feedbackMessage, setFeedbackMessage] = useState('');
+  const [sendingFeedback, setSendingFeedback] = useState(false);
+  const [bibleVersion, setBibleVersion] = useState<'KJV' | 'WEB'>('KJV');
 
   useEffect(() => {
     checkPermissionAndLoadApps();
   }, []);
+
+  const toggleTheme = async () => {
+    const newTheme = theme === 'dark' ? 'light' : 'dark';
+    try {
+      await BlockedAppsModule.setThemePreference(newTheme);
+      setTheme(newTheme);
+    } catch (error) {
+      console.error('Error saving theme:', error);
+    }
+  };
 
   const checkPermissionAndLoadApps = async () => {
     try {
@@ -71,21 +135,26 @@ function AppContent() {
         return;
       }
 
-      const [usageGranted, overlayGranted, savedCountdown] = await Promise.all([
+      const [usageGranted, overlayGranted, batteryOptDisabled, savedCountdown, savedVersion] = await Promise.all([
         BlockedAppsModule.hasUsageStatsPermission(),
         BlockedAppsModule.hasOverlayPermission(),
+        BlockedAppsModule.isBatteryOptimizationDisabled(),
         BlockedAppsModule.getCountdownTime(),
+        BlockedAppsModule.getBibleVersion(),
       ]);
 
       console.log('Usage permission granted:', usageGranted);
       console.log('Overlay permission granted:', overlayGranted);
+      console.log('Battery optimization disabled:', batteryOptDisabled);
       console.log('Saved countdown time:', savedCountdown);
 
       setHasPermission(usageGranted);
       setHasOverlayPermission(overlayGranted);
+      setHasBatteryOptimization(batteryOptDisabled);
       setCountdownTime(savedCountdown);
+      setBibleVersion(savedVersion as 'KJV' | 'WEB');
 
-      if (usageGranted && overlayGranted) {
+      if (usageGranted && overlayGranted && batteryOptDisabled) {
         console.log('Loading apps...');
         await loadApps();
       }
@@ -150,6 +219,16 @@ function AppContent() {
     }
   };
 
+  const requestBatteryOptimizationExemption = async () => {
+    try {
+      await BlockedAppsModule.requestBatteryOptimizationExemption();
+      // Check permission again after user returns
+      setTimeout(checkPermissionAndLoadApps, 1000);
+    } catch (error) {
+      console.error('Error requesting battery optimization exemption:', error);
+    }
+  };
+
   const toggleBlockedApp = async (packageName: string) => {
     try {
       const isBlocked = blockedApps.has(packageName);
@@ -181,34 +260,85 @@ function AppContent() {
     }
   };
 
+  const updateBibleVersion = async (version: 'KJV' | 'WEB') => {
+    try {
+      await BlockedAppsModule.setBibleVersion(version);
+      setBibleVersion(version);
+    } catch (error) {
+      console.error('Error updating bible version:', error);
+      Alert.alert('Error', 'Failed to update Bible version');
+    }
+  };
+
+  const submitFeedback = async () => {
+    if (!feedbackEmail.trim()) {
+      Alert.alert('Error', 'Please enter your email');
+      return;
+    }
+    if (!feedbackMessage.trim()) {
+      Alert.alert('Error', 'Please enter a message');
+      return;
+    }
+
+    setSendingFeedback(true);
+    try {
+      const response = await fetch('https://formspree.io/f/mykkkklg', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          email: feedbackEmail,
+          message: feedbackMessage,
+        }),
+      });
+
+      if (response.ok) {
+        Alert.alert('Thank you!', 'Your feedback has been sent.');
+        setFeedbackEmail('');
+        setFeedbackMessage('');
+        setShowFeedbackModal(false);
+      } else {
+        Alert.alert('Error', 'Failed to send feedback. Please try again.');
+      }
+    } catch (error) {
+      console.error('Error sending feedback:', error);
+      Alert.alert('Error', 'Failed to send feedback. Please check your connection.');
+    } finally {
+      setSendingFeedback(false);
+    }
+  };
+
   if (loading) {
     return (
-      <View style={[styles.container, {paddingTop: insets.top}]}>
-        <ActivityIndicator size="large" color="#2196F3" />
+      <View style={[styles.container, {backgroundColor: colors.background, paddingTop: insets.top}]}>
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
 
-  if (!hasPermission || !hasOverlayPermission) {
+  if (!hasPermission || !hasOverlayPermission || !hasBatteryOptimization) {
     return (
       <View
         style={[
           styles.container,
           {
+            backgroundColor: colors.background,
             paddingTop: insets.top,
             paddingBottom: insets.bottom,
           },
         ]}
       >
-        <Text style={styles.title}>📖 Bible Verse Gate</Text>
+        <Text style={[styles.title, {color: colors.text}]}>📖 Bible Verse App Blocker</Text>
 
-        <Text style={styles.subtitle}>
+        <Text style={[styles.subtitle, {color: colors.textSecondary}]}>
           Peace. Wisdom. One verse at a time.
         </Text>
 
         {!hasPermission && (
           <>
-            <Text style={styles.instructionText}>
+            <Text style={[styles.instructionText, {color: colors.textTertiary}]}>
               To monitor app usage, we need permission to access usage data.
             </Text>
 
@@ -223,7 +353,7 @@ function AppContent() {
 
         {hasPermission && !hasOverlayPermission && (
           <>
-            <Text style={styles.instructionText}>
+            <Text style={[styles.instructionText, {color: colors.textTertiary}]}>
               To show the Bible verse gate, we need permission to display over other apps.
             </Text>
 
@@ -232,6 +362,22 @@ function AppContent() {
                 title="2. Allow Display Over Other Apps"
                 onPress={requestOverlayPermission}
                 color="#4CAF50"
+              />
+            </View>
+          </>
+        )}
+
+        {hasPermission && hasOverlayPermission && !hasBatteryOptimization && (
+          <>
+            <Text style={[styles.instructionText, {color: colors.textTertiary}]}>
+              To ensure the app runs continuously in the background, we need to disable battery optimization.
+            </Text>
+
+            <View style={{marginTop: 30}}>
+              <Button
+                title="3. Disable Battery Optimization"
+                onPress={requestBatteryOptimizationExemption}
+                color="#FF9800"
               />
             </View>
           </>
@@ -252,15 +398,16 @@ function AppContent() {
     <View
       style={[
         styles.container,
+        {backgroundColor: colors.background},
         {
           paddingTop: insets.top,
           paddingBottom: insets.bottom,
         },
       ]}
     >
-      <Text style={styles.title}>📖 Bible Verse Gate</Text>
+        <Text style={[styles.title, {color: colors.text}]}>📖 Bible Verse App Blocker</Text>
 
-      <Text style={styles.subtitle}>
+      <Text style={[styles.subtitle, {color: colors.textSecondary}]}>
         {blockedApps.size === 0
           ? 'Select apps to block'
           : `${blockedApps.size} app${blockedApps.size === 1 ? '' : 's'} blocked`}
@@ -291,9 +438,9 @@ function AppContent() {
           {/* Search Bar */}
           <View style={styles.searchContainer}>
             <TextInput
-              style={styles.searchInput}
+              style={[styles.searchInput, {backgroundColor: colors.surface, color: colors.text}]}
               placeholder="Search apps..."
-              placeholderTextColor="#666666"
+              placeholderTextColor={colors.textDisabled}
               value={searchQuery}
               onChangeText={setSearchQuery}
             />
@@ -302,10 +449,10 @@ function AppContent() {
           {/* Filter Toggle */}
           <View style={styles.filterContainer}>
             <TouchableOpacity
-              style={styles.filterButton}
+              style={[styles.filterButton, {backgroundColor: colors.surface}]}
               onPress={() => setShowOnlyBlocked(!showOnlyBlocked)}
             >
-              <Text style={styles.filterText}>
+              <Text style={[styles.filterText, {color: colors.accent}]}>
                 {showOnlyBlocked ? '📋 Show All Apps' : '🔒 Show Blocked Only'}
               </Text>
             </TouchableOpacity>
@@ -318,10 +465,10 @@ function AppContent() {
             ListEmptyComponent={
               showOnlyBlocked ? (
                 <View style={styles.emptyState}>
-                  <Text style={styles.emptyStateText}>
+                  <Text style={[styles.emptyStateText, {color: colors.text}]}>
                     No blocked apps yet
                   </Text>
-                  <Text style={styles.emptyStateSubtext}>
+                  <Text style={[styles.emptyStateSubtext, {color: colors.textTertiary}]}>
                     Tap the "Show All Apps" button above to select apps to block
                   </Text>
                 </View>
@@ -332,7 +479,11 @@ function AppContent() {
               const usageTime = usageStats[item.packageName] || 0;
               return (
                 <TouchableOpacity
-                  style={[styles.appItem, isBlocked && styles.appItemBlocked]}
+                  style={[
+                    styles.appItem,
+                    {backgroundColor: colors.surface},
+                    isBlocked && {backgroundColor: colors.surfaceVariant, borderColor: colors.accent}
+                  ]}
                   onPress={() => toggleBlockedApp(item.packageName)}
                 >
                   <Image
@@ -340,9 +491,9 @@ function AppContent() {
                     style={styles.appIcon}
                   />
                   <View style={styles.appInfo}>
-                    <Text style={styles.appName}>{item.appName}</Text>
+                    <Text style={[styles.appName, {color: colors.text}]}>{item.appName}</Text>
                     {usageTime > 0 && (
-                      <Text style={styles.usageTime}>
+                      <Text style={[styles.usageTime, {color: colors.textTertiary}]}>
                         {formatUsageTime(usageTime)}
                       </Text>
                     )}
@@ -350,7 +501,8 @@ function AppContent() {
                   <View
                     style={[
                       styles.checkbox,
-                      isBlocked && styles.checkboxChecked,
+                      {borderColor: colors.border},
+                      isBlocked && {backgroundColor: colors.accent, borderColor: colors.accent}
                     ]}
                   >
                     {isBlocked && <Text style={styles.checkmark}>✓</Text>}
@@ -361,9 +513,55 @@ function AppContent() {
           />
         </>
       ) : (
-        <View style={styles.settingsContainer}>
-          <Text style={styles.settingsTitle}>⏱️ Countdown Timer</Text>
-          <Text style={styles.settingsDescription}>
+        <ScrollView style={styles.settingsContainer} contentContainerStyle={{paddingBottom: 40}} showsVerticalScrollIndicator={false}>
+          <View style={styles.settingSection}>
+            <View style={styles.settingHeader}>
+              <Text style={[styles.settingsTitle, {color: colors.text}]}>
+                {theme === 'dark' ? '🌙' : '☀️'} Theme
+              </Text>
+              <Switch
+                value={theme === 'light'}
+                onValueChange={toggleTheme}
+                trackColor={{false: '#767577', true: colors.accent}}
+                thumbColor={theme === 'light' ? '#ffffff' : '#f4f3f4'}
+              />
+            </View>
+            <Text style={[styles.settingsDescription, {color: colors.textTertiary}]}>
+              {theme === 'dark' ? 'Dark mode' : 'Light mode'}
+            </Text>
+          </View>
+
+          <Text style={[styles.settingsTitle, {color: colors.text}]}>📖 Bible Version</Text>
+          <Text style={[styles.settingsDescription, {color: colors.textTertiary}]}>
+            Choose which translation to display on the gate screen
+          </Text>
+
+          <View style={styles.countdownOptions}>
+            {(['KJV', 'WEB'] as const).map(version => (
+              <TouchableOpacity
+                key={version}
+                style={[
+                  styles.countdownOption,
+                  {backgroundColor: colors.surface, borderColor: colors.surface},
+                  bibleVersion === version && {backgroundColor: colors.surfaceVariant, borderColor: colors.accent},
+                ]}
+                onPress={() => updateBibleVersion(version)}
+              >
+                <Text
+                  style={[
+                    styles.countdownOptionText,
+                    {color: colors.textDisabled},
+                    bibleVersion === version && {color: colors.accent},
+                  ]}
+                >
+                  {version}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          <Text style={[styles.settingsTitle, {color: colors.text}]}>⏱️ Countdown Timer</Text>
+          <Text style={[styles.settingsDescription, {color: colors.textTertiary}]}>
             Time before "Continue" button becomes active
           </Text>
 
@@ -373,14 +571,16 @@ function AppContent() {
                 key={seconds}
                 style={[
                   styles.countdownOption,
-                  countdownTime === seconds && styles.countdownOptionActive,
+                  {backgroundColor: colors.surface, borderColor: colors.surface},
+                  countdownTime === seconds && {backgroundColor: colors.surfaceVariant, borderColor: colors.accent},
                 ]}
                 onPress={() => updateCountdownTime(seconds)}
               >
                 <Text
                   style={[
                     styles.countdownOptionText,
-                    countdownTime === seconds && styles.countdownOptionTextActive,
+                    {color: colors.textDisabled},
+                    countdownTime === seconds && {color: colors.accent},
                   ]}
                 >
                   {seconds}s
@@ -389,23 +589,93 @@ function AppContent() {
             ))}
           </View>
 
-          <View style={styles.statsContainer}>
-            <Text style={styles.statsTitle}>📊 Statistics</Text>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Total Apps</Text>
-              <Text style={styles.statValue}>{installedApps.length}</Text>
+          <View style={[styles.statsContainer, {backgroundColor: colors.surface}]}>
+            <Text style={[styles.statsTitle, {color: colors.text}]}>📊 Statistics</Text>
+            <View style={[styles.statItem, {borderBottomColor: colors.border}]}>
+              <Text style={[styles.statLabel, {color: colors.textTertiary}]}>Total Apps</Text>
+              <Text style={[styles.statValue, {color: colors.accent}]}>{installedApps.length}</Text>
             </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Blocked Apps</Text>
-              <Text style={styles.statValue}>{blockedApps.size}</Text>
+            <View style={[styles.statItem, {borderBottomColor: colors.border}]}>
+              <Text style={[styles.statLabel, {color: colors.textTertiary}]}>Blocked Apps</Text>
+              <Text style={[styles.statValue, {color: colors.accent}]}>{blockedApps.size}</Text>
             </View>
-            <View style={styles.statItem}>
-              <Text style={styles.statLabel}>Unblocked Apps</Text>
-              <Text style={styles.statValue}>{installedApps.length - blockedApps.size}</Text>
+            <View style={[styles.statItem, {borderBottomColor: colors.border}]}>
+              <Text style={[styles.statLabel, {color: colors.textTertiary}]}>Unblocked Apps</Text>
+              <Text style={[styles.statValue, {color: colors.accent}]}>{installedApps.length - blockedApps.size}</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={[styles.feedbackButton, {backgroundColor: colors.surface}]}
+            onPress={() => setShowFeedbackModal(true)}
+          >
+            <Text style={[styles.feedbackButtonText, {color: colors.accent}]}>
+              💬 Send Feedback
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
+      )}
+
+      {/* Feedback Modal */}
+      <Modal
+        visible={showFeedbackModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowFeedbackModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, {backgroundColor: colors.surface}]}>
+            <Text style={[styles.modalTitle, {color: colors.text}]}>Send Feedback</Text>
+
+            <Text style={[styles.inputLabel, {color: colors.textSecondary}]}>
+              Email <Text style={{color: '#ff6b6b'}}>*</Text>
+            </Text>
+            <TextInput
+              style={[styles.modalInput, {backgroundColor: colors.background, color: colors.text, borderColor: colors.border}]}
+              placeholder="your@email.com"
+              placeholderTextColor={colors.textDisabled}
+              value={feedbackEmail}
+              onChangeText={setFeedbackEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+
+            <Text style={[styles.inputLabel, {color: colors.textSecondary}]}>
+              Message <Text style={{color: '#ff6b6b'}}>*</Text>
+            </Text>
+            <TextInput
+              style={[styles.modalInput, styles.messageInput, {backgroundColor: colors.background, color: colors.text, borderColor: colors.border}]}
+              placeholder="Your feedback..."
+              placeholderTextColor={colors.textDisabled}
+              value={feedbackMessage}
+              onChangeText={setFeedbackMessage}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.cancelButton, {borderColor: colors.border}]}
+                onPress={() => setShowFeedbackModal(false)}
+              >
+                <Text style={[styles.cancelButtonText, {color: colors.textSecondary}]}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButton, styles.sendButton, {backgroundColor: colors.accent}]}
+                onPress={submitFeedback}
+                disabled={sendingFeedback}
+              >
+                {sendingFeedback ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.sendButtonText}>Send</Text>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </View>
-      )}
+      </Modal>
     </View>
   );
 }
@@ -547,6 +817,18 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingTop: 12,
   },
+  settingSection: {
+    marginBottom: 30,
+    paddingBottom: 24,
+    borderBottomWidth: 1,
+    borderBottomColor: '#333333',
+  },
+  settingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
   settingsTitle: {
     fontSize: 18,
     fontWeight: '600',
@@ -630,6 +912,77 @@ const styles = StyleSheet.create({
     color: '#aaaaaa',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  feedbackButton: {
+    marginTop: 24,
+    paddingVertical: 16,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  feedbackButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    borderRadius: 12,
+    padding: 24,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  inputLabel: {
+    fontSize: 14,
+    marginBottom: 8,
+  },
+  modalInput: {
+    borderWidth: 1,
+    borderRadius: 8,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    fontSize: 14,
+    marginBottom: 16,
+  },
+  messageInput: {
+    minHeight: 100,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: 12,
+    marginTop: 8,
+  },
+  modalButton: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelButton: {
+    borderWidth: 1,
+  },
+  cancelButtonText: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  sendButton: {
+    backgroundColor: '#2196F3',
+  },
+  sendButtonText: {
+    color: '#ffffff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 
